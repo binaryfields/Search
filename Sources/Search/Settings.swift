@@ -537,55 +537,67 @@ struct SettingsPanel: View {
 
     // MARK: - privacy
 
+    /// In the order browsers keep them: what watches you first, then what
+    /// has been kept, then what sites were allowed — each under its name.
     private var privacy: some View {
         VStack(alignment: .leading, spacing: 18) {
-            Card {
-                Line("Block ads and trackers", shield.trouble ?? "Third parties whose only job is to watch") {
-                    Switch(on: $prefs.shielded)
-                }
-                if let trouble = shield.trouble {
+            VStack(alignment: .leading, spacing: 6) {
+                Caption("Tracking")
+                Card {
+                    Line("Block ads and trackers", shield.trouble ?? "Third parties whose only job is to watch") {
+                        Switch(on: $prefs.shielded)
+                    }
+                    if let trouble = shield.trouble {
+                        Rule()
+                        Line(trouble, "Nothing is being blocked until this clears — try again, or restart Search") {
+                            Pill("Try again") { shield.compile() }
+                        }
+                    }
+                    if let host = browser.hereHost, prefs.shielded, shield.trouble == nil {
+                        Rule()
+                        Line("Block on \(host)", "Turn off here if the site breaks — the page reloads") {
+                            Switch(on: Binding(
+                                get: { !Shield.shared.isPaused(on: host) },
+                                set: { on in
+                                    Shield.shared.pause(host, !on)
+                                    browser.reload()
+                                }
+                            ))
+                        }
+                    }
                     Rule()
-                    Line(trouble, "Nothing is being blocked until this clears — try again, or restart Search") {
-                        Pill("Try again") { shield.compile() }
+                    Line("Prevent cross-site tracking", "As in Safari. Off, sites you rarely open keep their sign-ins, and trackers inside other sites can follow you across them again, as in Chrome. Private tabs keep it on") {
+                        Switch(on: Binding(get: { !prefs.keepsSignIns }, set: { prefs.keepsSignIns = !$0 }))
                     }
                 }
-                if let host = browser.hereHost, prefs.shielded, shield.trouble == nil {
-                    Rule()
-                    Line("Block on \(host)", "Turn off here if the site breaks — the page reloads") {
-                        Switch(on: Binding(
-                            get: { !Shield.shared.isPaused(on: host) },
-                            set: { on in
-                                Shield.shared.pause(host, !on)
-                                browser.reload()
-                            }
-                        ))
-                    }
-                }
-                Rule()
-                Line("Prevent cross-site tracking", "As in Safari. Off, sites you rarely open keep their sign-ins, and trackers inside other sites can follow you across them again, as in Chrome. Private tabs keep it on") {
-                    Switch(on: Binding(get: { !prefs.keepsSignIns }, set: { prefs.keepsSignIns = !$0 }))
-                }
-                Rule()
-                Line("Camera, microphone, location and notifications", "What each site was allowed or refused") {
-                    Pill("Forget choices") { browser.forgetCaptureChoices() }
-                }
-                Rule()
-                Line("Let sites ask to send notifications", "A site asks on a card over its page, and only one you allow reaches your Mac's notifications. Private tabs are never asked") {
-                    Switch(on: $prefs.siteNotifications)
-                }
-                NotificationSites()
             }
-            Card {
-                Line("History", "Every address you have been to") {
-                    Pill("Clear") { browser.clearHistory() }
+            VStack(alignment: .leading, spacing: 6) {
+                Caption("Browsing data")
+                Card {
+                    Line("History", "Every address you have been to") {
+                        Pill("Clear") { browser.clearHistory() }
+                    }
+                    Rule()
+                    Line("Cookies and sign-ins", "Signs you out of every site") {
+                        Pill("Sign out of everything") { browser.clearSites() }
+                    }
+                    Rule()
+                    Line("Cache", "Only what was fetched to draw pages") {
+                        Pill("Clear") { browser.clearCache() }
+                    }
                 }
-                Rule()
-                Line("Cookies and sign-ins", "Signs you out of every site") {
-                    Pill("Sign out of everything") { browser.clearSites() }
-                }
-                Rule()
-                Line("Cache", "Only what was fetched to draw pages") {
-                    Pill("Clear") { browser.clearCache() }
+            }
+            VStack(alignment: .leading, spacing: 6) {
+                Caption("Permissions")
+                Card {
+                    Line("Camera, microphone, location and notifications", "What each site was allowed or refused") {
+                        Pill("Forget choices") { browser.forgetCaptureChoices() }
+                    }
+                    Rule()
+                    Line("Let sites ask to send notifications", "A site asks on a card over its page, and only one you allow reaches your Mac's notifications. Private tabs are never asked") {
+                        Switch(on: $prefs.siteNotifications)
+                    }
+                    NotificationSites()
                 }
             }
         }
