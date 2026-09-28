@@ -161,185 +161,213 @@ struct SettingsPanel: View {
 
     // MARK: - general
 
+    /// What Search is to this Mac first, then where typed words go, how
+    /// pages look, the mouse and keyboard, video — each under its name, the
+    /// switch for scripts last.
     private var general: some View {
-        Card {
-            Line(
-                "Open links from other apps",
-                isDefault ? "Search is the default browser on this Mac" : "Mail, Slack and the rest still send links elsewhere"
-            ) {
-                if isDefault {
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(Palette.ink)
-                        .frame(width: 24)
-                } else {
-                    Pill("Make default", filled: true) {
-                        Links.becomeDefault { worked in
-                            isDefault = Links.isDefault
-                            browser.announce(worked && isDefault ? "Links now open here" : "macOS didn't change it")
+        VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: 6) {
+                Caption("Default browser")
+                Card {
+                    Line(
+                        "Open links from other apps",
+                        isDefault ? "Search is the default browser on this Mac" : "Mail, Slack and the rest still send links elsewhere"
+                    ) {
+                        if isDefault {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(Palette.ink)
+                                .frame(width: 24)
+                        } else {
+                            Pill("Make default", filled: true) {
+                                Links.becomeDefault { worked in
+                                    isDefault = Links.isDefault
+                                    browser.announce(worked && isDefault ? "Links now open here" : "macOS didn't change it")
+                                }
+                            }
+                        }
+                    }
+                    Rule()
+                    Line("Open links from other apps in a small window", "To read and close, or keep with Open in Search (⌘O)") {
+                        Switch(on: $prefs.littleLinks)
+                    }
+                    Rule()
+                    // Coming from another browser, now or any time later: the same
+                    // sheet as File › Bring Things Over… and the Welcome's.
+                    Line("Bring things over", "Bookmarks, history, passwords and extensions from another browser on this Mac, or from a file it exported") {
+                        Pill("Bring Things Over…") {
+                            browser.tuning = false
+                            browser.bringingIn = ""
                         }
                     }
                 }
             }
-            Rule()
-            // Coming from another browser, now or any time later: the same
-            // sheet as File › Bring Things Over… and the Welcome's.
-            Line("Bring things over", "Bookmarks, history, passwords and extensions from another browser on this Mac, or from a file it exported") {
-                Pill("Bring Things Over…") {
-                    browser.tuning = false
-                    browser.bringingIn = ""
-                }
-            }
-            Rule()
-            Line("Search with", searchDetail) {
-                Picker("", selection: $prefs.engine) {
-                    ForEach(Engine.allCases) { engine in
-                        Text(engine.title).tag(engine)
+            VStack(alignment: .leading, spacing: 6) {
+                Caption("Search")
+                Card {
+                    Line("Search with", searchDetail) {
+                        Picker("", selection: $prefs.engine) {
+                            ForEach(Engine.allCases) { engine in
+                                Text(engine.title).tag(engine)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+                        .fixedSize()
                     }
-                }
-                .labelsHidden()
-                .pickerStyle(.menu)
-                .fixedSize()
-            }
-            if prefs.engine == .custom {
-                ZStack(alignment: .leading) {
-                    if prefs.customEngine.isEmpty {
-                        Text("https://example.com/search?q=%s")
-                            .foregroundStyle(Palette.muted.opacity(0.8))
+                    if prefs.engine == .custom {
+                        ZStack(alignment: .leading) {
+                            if prefs.customEngine.isEmpty {
+                                Text("https://example.com/search?q=%s")
+                                    .foregroundStyle(Palette.muted.opacity(0.8))
+                            }
+                            TextField("", text: $prefs.customEngine)
+                                .textFieldStyle(.plain)
+                                .foregroundStyle(Palette.ink)
+                        }
+                        .font(.system(size: 12.5))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 7)
+                        .background(Palette.wash, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                        .padding(.horizontal, 14)
+                        .padding(.bottom, 11)
                     }
-                    TextField("", text: $prefs.customEngine)
-                        .textFieldStyle(.plain)
+                    Rule()
+                    Line("Site shortcuts", keywordDetail) {
+                        if draft == nil {
+                            Pill("Add") { draft = Keyword() }
+                        } else {
+                            HStack(spacing: 6) {
+                                Pill("Cancel") { draft = nil }
+                                Pill("Save", filled: true) { saveDraft() }
+                                    .disabled(draftProblem != nil)
+                                    .opacity(draftProblem == nil ? 1 : 0.4)
+                            }
+                        }
+                    }
+                    if let current = draft {
+                        HStack(spacing: 8) {
+                            TextField("yt", text: Binding(
+                                get: { current.keyword },
+                                set: { draft?.keyword = $0 }
+                            ))
+                            .textFieldStyle(.plain)
+                            .frame(width: 50)
+                            Text("→").foregroundStyle(Palette.muted)
+                            TextField("https://www.youtube.com/results?search_query=%s", text: Binding(
+                                get: { current.template },
+                                set: { draft?.template = $0 }
+                            ))
+                            .textFieldStyle(.plain)
+                            .onSubmit(saveDraft)
+                        }
+                        .font(.system(size: 12.5))
                         .foregroundStyle(Palette.ink)
-                }
-                .font(.system(size: 12.5))
-                .padding(.horizontal, 10)
-                .padding(.vertical, 7)
-                .background(Palette.wash, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-                .padding(.horizontal, 14)
-                .padding(.bottom, 11)
-            }
-            Rule()
-            Line("Site shortcuts", keywordDetail) {
-                if draft == nil {
-                    Pill("Add") { draft = Keyword() }
-                } else {
-                    HStack(spacing: 6) {
-                        Pill("Cancel") { draft = nil }
-                        Pill("Save", filled: true) { saveDraft() }
-                            .disabled(draftProblem != nil)
-                            .opacity(draftProblem == nil ? 1 : 0.4)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 7)
+                        .background(Palette.wash, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                        .padding(.horizontal, 14)
+                        .padding(.bottom, 6)
+                    }
+                    ForEach(prefs.keywords) { entry in
+                        HStack(spacing: 8) {
+                            Text(entry.keyword)
+                                .frame(width: 50, alignment: .leading)
+                            Text("→").foregroundStyle(Palette.muted)
+                            Text(entry.template)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            Button {
+                                prefs.keywords.removeAll { $0.id == entry.id }
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundStyle(Palette.faint)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .font(.system(size: 12.5))
+                        .foregroundStyle(Palette.ink)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 7)
+                        .background(Palette.wash, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                        .padding(.horizontal, 14)
+                        .padding(.bottom, 6)
+                    }
+                    Rule()
+                    Line("Address bar commands", "A word like \"settings\" or \"new tab\", typed alone in the address field, goes there instead of searching for it") {
+                        Switch(on: $prefs.commandBar)
                     }
                 }
             }
-            if let current = draft {
-                HStack(spacing: 8) {
-                    TextField("yt", text: Binding(
-                        get: { current.keyword },
-                        set: { draft?.keyword = $0 }
-                    ))
-                    .textFieldStyle(.plain)
-                    .frame(width: 50)
-                    Text("→").foregroundStyle(Palette.muted)
-                    TextField("https://www.youtube.com/results?search_query=%s", text: Binding(
-                        get: { current.template },
-                        set: { draft?.template = $0 }
-                    ))
-                    .textFieldStyle(.plain)
-                    .onSubmit(saveDraft)
-                }
-                .font(.system(size: 12.5))
-                .foregroundStyle(Palette.ink)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 7)
-                .background(Palette.wash, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-                .padding(.horizontal, 14)
-                .padding(.bottom, 6)
-            }
-            ForEach(prefs.keywords) { entry in
-                HStack(spacing: 8) {
-                    Text(entry.keyword)
-                        .frame(width: 50, alignment: .leading)
-                    Text("→").foregroundStyle(Palette.muted)
-                    Text(entry.template)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    Button {
-                        prefs.keywords.removeAll { $0.id == entry.id }
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(Palette.faint)
+            VStack(alignment: .leading, spacing: 6) {
+                Caption("Appearance")
+                Card {
+                    Line("Appearance", "Light, dark, or whatever the Mac is doing — pages follow it too") {
+                        Segmented(options: Look.allCases.map { ($0, $0.title) }, selection: $prefs.look)
                     }
-                    .buttonStyle(.plain)
+                    Rule()
+                    Line("Page zoom", "Where every site starts. ⌘+ and ⌘− are still remembered for each site.") {
+                        // The number itself takes it back to 100%.
+                        Steps(stops: Preferences.zooms, value: $prefs.pageZoom, home: 1) { "\(Int(($0 * 100).rounded()))%" }
+                    }
+                    Rule()
+                    Line("Show where links go", "Point at a link and its address shows at the bottom of the page") {
+                        Switch(on: $prefs.showsLinks)
+                    }
+                    Rule()
+                    Line("Pages at 120 Hz", "Animations and scrolling in pages at up to 120 frames a second on a screen that can, instead of 60 as in Safari. Uses more battery. Open tabs follow when reloaded") {
+                        Switch(on: $prefs.fastPages)
+                    }
                 }
-                .font(.system(size: 12.5))
-                .foregroundStyle(Palette.ink)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 7)
-                .background(Palette.wash, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-                .padding(.horizontal, 14)
-                .padding(.bottom, 6)
             }
-            Rule()
-            Line("Appearance", "Light, dark, or whatever the Mac is doing — pages follow it too") {
-                Segmented(options: Look.allCases.map { ($0, $0.title) }, selection: $prefs.look)
+            VStack(alignment: .leading, spacing: 6) {
+                Caption("Mouse, trackpad and keyboard")
+                Card {
+                    Line("Correct spelling as you type", "macOS's autocorrect inside pages — the one that capitalises for you") {
+                        Switch(on: $prefs.autocorrect)
+                    }
+                    Rule()
+                    Line("Peek at a link with a shift-click", "Its page opens in a panel over the one you're reading. Escape puts it away; the other button keeps it as a tab") {
+                        Switch(on: $prefs.peeksLinks)
+                    }
+                    Rule()
+                    Line("Scroll with the middle button", "Click the wheel on a page, then move the mouse up or down to scroll, as on Windows. Click again to stop") {
+                        Switch(on: $prefs.autoScroll)
+                    }
+                    Rule()
+                    Line("Hold a swipe to pick from history", "Swipe back or forward and keep your fingers down: the pages that way appear, and moving up or down picks one to go to") {
+                        Switch(on: $prefs.holdsHistory)
+                    }
+                }
             }
-            Rule()
-            Line("Page zoom", "Where every site starts. ⌘+ and ⌘− are still remembered for each site.") {
-                // The number itself takes it back to 100%.
-                Steps(stops: Preferences.zooms, value: $prefs.pageZoom, home: 1) { "\(Int(($0 * 100).rounded()))%" }
+            VStack(alignment: .leading, spacing: 6) {
+                Caption("Video")
+                Card {
+                    Line("Videos wait for a click", "Videos don't start by themselves, even without sound; they play when you press play. Tabs already open follow once closed and opened again, or after they've slept") {
+                        Switch(on: $prefs.waitsForPlay)
+                    }
+                    Rule()
+                    Line("Float the video when you switch tabs", "A video playing on YouTube and the like comes out into its floating window when you go to another tab, and back when you return. ⇧⌘P still floats one by hand") {
+                        Switch(on: $prefs.floatsOnLeave)
+                    }
+                    Rule()
+                    Line("Float the video when you switch apps", "A video playing on the site you're on comes out into its floating window as another app comes to the front, and goes back into its tab when you return") {
+                        Switch(on: $prefs.floatsAway)
+                    }
+                    Rule()
+                    Line("Flick the floating video to a corner", "Two fingers on it send it to the corner or edge they point at, instead of pushing it along; a strong swipe at the side of the screen it is against tucks it in there, a sliver left to bring it back by. Dragging still puts it anywhere") {
+                        Switch(on: $prefs.floatFlicks)
+                    }
+                }
             }
-            Rule()
-            Line("Correct spelling as you type", "macOS's autocorrect inside pages — the one that capitalises for you") {
-                Switch(on: $prefs.autocorrect)
-            }
-            Rule()
-            Line("Peek at a link with a shift-click", "Its page opens in a panel over the one you're reading. Escape puts it away; the other button keeps it as a tab") {
-                Switch(on: $prefs.peeksLinks)
-            }
-            Rule()
-            Line("Open links from other apps in a small window", "To read and close, or keep with Open in Search (⌘O)") {
-                Switch(on: $prefs.littleLinks)
-            }
-            Rule()
-            Line("Address bar commands", "A word like \"settings\" or \"new tab\", typed alone in the address field, goes there instead of searching for it") {
-                Switch(on: $prefs.commandBar)
-            }
-            Rule()
-            Line("Show where links go", "Point at a link and its address shows at the bottom of the page") {
-                Switch(on: $prefs.showsLinks)
-            }
-            Rule()
-            Line("Scroll with the middle button", "Click the wheel on a page, then move the mouse up or down to scroll, as on Windows. Click again to stop") {
-                Switch(on: $prefs.autoScroll)
-            }
-            Rule()
-            Line("Pages at 120 Hz", "Animations and scrolling in pages at up to 120 frames a second on a screen that can, instead of 60 as in Safari. Uses more battery. Open tabs follow when reloaded") {
-                Switch(on: $prefs.fastPages)
-            }
-            Rule()
-            Line("Hold a swipe to pick from history", "Swipe back or forward and keep your fingers down: the pages that way appear, and moving up or down picks one to go to") {
-                Switch(on: $prefs.holdsHistory)
-            }
-            Rule()
-            Line("Flick the floating video to a corner", "Two fingers on it send it to the corner or edge they point at, instead of pushing it along; a strong swipe at the side of the screen it is against tucks it in there, a sliver left to bring it back by. Dragging still puts it anywhere") {
-                Switch(on: $prefs.floatFlicks)
-            }
-            Rule()
-            Line("Videos wait for a click", "Videos don't start by themselves, even without sound; they play when you press play. Tabs already open follow once closed and opened again, or after they've slept") {
-                Switch(on: $prefs.waitsForPlay)
-            }
-            Rule()
-            Line("Float the video when you switch tabs", "A video playing on YouTube and the like comes out into its floating window when you go to another tab, and back when you return. ⇧⌘P still floats one by hand") {
-                Switch(on: $prefs.floatsOnLeave)
-            }
-            Rule()
-            Line("Float the video when you switch apps", "A video playing on the site you're on comes out into its floating window as another app comes to the front, and goes back into its tab when you return") {
-                Switch(on: $prefs.floatsAway)
-            }
-            Rule()
-            Line("Let a script drive Search", "A local socket for testing. Its tabs open beside yours with a flask on them and never take over — see ./bench") {
-                Switch(on: $prefs.bench)
+            VStack(alignment: .leading, spacing: 6) {
+                Caption("Developer")
+                Card {
+                    Line("Let a script drive Search", "A local socket for testing. Its tabs open beside yours with a flask on them and never take over — see ./bench") {
+                        Switch(on: $prefs.bench)
+                    }
+                }
             }
         }
     }
